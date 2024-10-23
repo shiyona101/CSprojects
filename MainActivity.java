@@ -1,488 +1,335 @@
-package com.example.atariproject;
+package com.example.whackamoleproject;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.media.MediaPlayer;
-import android.media.SoundPool;
+import android.content.Intent;
 import android.os.Bundle;
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.Point;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
-import android.util.Log;
-import android.view.Display;
-import android.view.MotionEvent;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
+import android.view.animation.RotateAnimation;
+import android.view.animation.ScaleAnimation;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
+public class MainActivity extends AppCompatActivity {
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener{
+    ImageView[] iceCreams;
+    ImageView[] powerUps;
 
-    GameSurface gameSurface;
-    float angle;
-    private int score = 0;
-
-    Bitmap filledBasketBall;
-    Bitmap filledBasket;
-    Bitmap crashBasketBall;
-    Bitmap earthwormBasket;
-    Bitmap powerupBasketBall;
-    Bitmap powerupBasket;
-    MediaPlayer mediaPlayer;
+    Button start;
+    TextView time;
+    private int timeValue;
+    private boolean isRunning;
+    Random random;
+    Handler handler;
+    private List<ImageView> tallyMarks = new ArrayList<>();
+    private int tallyCount = 0;
+    private int tallyWidth = 50;
+    private int tallySpacing = 4;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        gameSurface = new GameSurface(this);
-        setContentView(gameSurface);
 
-        SensorManager sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        Sensor accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-        sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        start = findViewById(R.id.startButton);
+        time = findViewById(R.id.id_timeText);
 
-        int filledWidth = 250;
-        int filledHeight = 250;
+        handler = new Handler(Looper.getMainLooper());
+        random = new Random();
+        timeValue = 30;
+        isRunning = false;
 
-        filledBasketBall = BitmapFactory.decodeResource(getResources(), R.drawable.filledbasket);
-        crashBasketBall = BitmapFactory.decodeResource(getResources(), R.drawable.crashedearthworm);
-        powerupBasketBall = BitmapFactory.decodeResource(getResources(), R.drawable.tangledflowerbasket);
-        filledBasket = Bitmap.createScaledBitmap(filledBasketBall, filledWidth, filledHeight, false);
-        earthwormBasket = Bitmap.createScaledBitmap(crashBasketBall, filledWidth, filledHeight, false);
-        powerupBasket = Bitmap.createScaledBitmap(powerupBasketBall, filledWidth, filledHeight, false);
+        iceCreams = new ImageView[]{
+                findViewById(R.id.darkpink),
+                findViewById(R.id.lightpink),
+                findViewById(R.id.teal),
+                findViewById(R.id.purple),
+                findViewById(R.id.brown),
+                findViewById(R.id.green)
+        };
 
-        mediaPlayer = MediaPlayer.create(this, R.raw.backgroundmusic);
-        mediaPlayer.setLooping(true);
-        mediaPlayer.start();
-
-
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        gameSurface.pause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        gameSurface.resume();
-    }
+        powerUps = new ImageView[]{
+                findViewById(R.id.darkPinkPowerUp),
+                findViewById(R.id.lightpinkPowerUp),
+                findViewById(R.id.tealPowerUp),
+                findViewById(R.id.purplePowerUp),
+                findViewById(R.id.brownPowerUp),
+                findViewById(R.id.greenPowerUp)
+        };
 
 
-    @Override
-    public void onSensorChanged(SensorEvent sensorEvent) {
-        angle = sensorEvent.values[1];
-        Log.d("TAG_YOURE_IT", angle + "");
-    }
+//when button is clicked, game will start
+        start.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                resetGame();
+                hideViews();
+                startAnimations();
+                startTimer();
 
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
-
-    public class GameSurface extends SurfaceView implements Runnable, View.OnTouchListener{
-
-        Thread gameThread;
-        SurfaceHolder holder;
-        volatile boolean running = false;
-        Bitmap originalBall;
-        Bitmap basket;
-        Bitmap basket2;
-        Bitmap backgroundImage;
-
-
-        int ballX = 0;
-        int x = 200;
-        Paint paintProperty;
-        Paint textPaint;
-        int screenWidth;
-        int screenHeight;
-
-        private List<FallingImage> fallingFlowers;
-        private Bitmap[] flowerBitmaps;
-
-        boolean isCrashed = false;
-        long crashTime = 0;
-        long crashDuration = 2000;
-
-        private SoundPool soundPool;
-        private int soundFlowerCollision;
-        private int soundEarthwormCollision;
-        private int soundPowerupCollision;
-        private int soundGameOver;
-
-
-        public GameSurface(Context context) {
-            super(context);
-            holder = getHolder();
-            backgroundImage = BitmapFactory.decodeResource(getResources(), R.drawable.background);
-            originalBall = BitmapFactory.decodeResource(getResources(),R.drawable.basket);
-
-            int desiredWidth = 250;
-            int desiredHeight = 250;
-            basket = Bitmap.createScaledBitmap(originalBall, desiredWidth, desiredHeight, false);
-            basket2 = Bitmap.createScaledBitmap(originalBall, desiredWidth, desiredHeight, false);
-
-            fallingFlowers = new ArrayList<>();
-            flowerBitmaps = new Bitmap[5];
-            flowerBitmaps[0] = BitmapFactory.decodeResource(getResources(), R.drawable.blueflower);
-            flowerBitmaps[1] = BitmapFactory.decodeResource(getResources(), R.drawable.pinkflower);
-            flowerBitmaps[2] = BitmapFactory.decodeResource(getResources(), R.drawable.purpleflower);
-            flowerBitmaps[3] = BitmapFactory.decodeResource(getResources(), R.drawable.tangledflowerpowerup);
-            flowerBitmaps[4] = BitmapFactory.decodeResource(getResources(), R.drawable.earthworm);
-
-            Display screenDisplay = getWindowManager().getDefaultDisplay();
-            Point sizeOfScreen = new Point();
-            screenDisplay.getSize(sizeOfScreen);
-            screenWidth = sizeOfScreen.x;
-            screenHeight = sizeOfScreen.y;
-            paintProperty = new Paint();
-            paintProperty.setTextSize(75);
-            paintProperty.setTypeface(Typeface.create("Arial", Typeface.BOLD));
-            textPaint = new Paint();
-            textPaint.setTextSize(60);
-            textPaint.setTypeface(Typeface.create("Arial", Typeface.BOLD));
-
-            soundPool = new SoundPool.Builder().setMaxStreams(3).build();
-            soundFlowerCollision = soundPool.load(context, R.raw.flowereffect, 1);
-            soundEarthwormCollision = soundPool.load(context, R.raw.earthwormeffect, 1);
-            soundPowerupCollision = soundPool.load(context, R.raw.powerupeffect, 1);
-            soundGameOver = soundPool.load(context, R.raw.gameovereffect, 1);
-
-            setOnTouchListener(this);
-        }
-
-        @Override
-        public void run() {
-            while (running == true) {
-
-                if (holder.getSurface().isValid() == false)
-                    continue;
-
-                Canvas canvas = holder.lockCanvas();
-
-                canvas.drawBitmap(backgroundImage, -600, -200, null);
-
-                if (score >= 30) {
-                    GameOverScreen.drawOver(canvas, score);
-                    running = false;
-                    makeTransparent(basket2, 0);
-                    mediaPlayer.stop();
-                    playGameOverSound();
-                    Log.d("Game Over", "You're finished! The score you got was: " + score);
+                // Set click listeners for moles
+                for (ImageView iceCream : iceCreams) {
+                    iceCream.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            scaleAndSpinView(iceCream);
+                            addTallyMark();
+                        }
+                    });
                 }
 
-                    Paint menuPaint = new Paint();
-                    menuPaint.setColor(Color.rgb(211, 137, 241));
-                    canvas.drawRect((screenWidth / 2) - basket.getWidth() / 2 - 450, (screenHeight - 260), (screenWidth / 2) + basket.getWidth() / 2 + 450, (screenHeight - 70), menuPaint);
-
-
-                    if (fallingFlowers.isEmpty() || fallingFlowers.get(fallingFlowers.size() - 1).getY() > screenHeight) {
-                        spawnFlower();
-                    }
-
-                    for (int i = 0; i < fallingFlowers.size(); i++) {
-                        FallingImage fallingFlower = fallingFlowers.get(i);
-                        fallingFlower.update();
-
-                        if (fallingFlower.getY() >= 1750) {
-                            fallingFlowers.remove(i);
-                            i--;
+                // Set click listeners for power-ups
+                for (ImageView powerUp : powerUps) {
+                    powerUp.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            scaleAndSpinView(powerUp);
+                            addTallyMark();
+                            increaseTimeByFiveSeconds();
                         }
+                    });
+                }
+            }
+        });
 
-                        else {
-                            fallingFlower.draw(canvas);
+    }
 
-                            Log.d("Collision Detected?", collisionDetect(fallingFlower) + "");
+//setting all images to invisible in the beginning
+    private void hideViews(){
+        for (ImageView iC : iceCreams) {
+            iC.setVisibility(View.INVISIBLE);
+        }
+        for (ImageView pU : powerUps) {
+            pU.setVisibility(View.INVISIBLE);
+        }
+    }
 
-                            if (!isCrashed && collisionDetect(fallingFlower)) {
+//setting up timer in thread
+    private void startTimer(){
+        isRunning = true;
 
-                                if (fallingFlower.getImageId() == R.drawable.earthworm) {
-                                    basket = earthwormBasket;
-                                    Log.d("TAG_COLLIDED", "earthworm is detected");
-                                    isCrashed = true;
-                                    crashTime = System.currentTimeMillis();
-                                    score--;
-                                    playEarthwormSound();
-                                }
-
-                                else if (fallingFlower.getImageId() == R.drawable.tangledflowerpowerup) {
-                                    basket = powerupBasket;
-                                    Log.d("TAG_COLLIDED", "tangled flower is detected");
-                                    isCrashed = true;
-                                    crashTime = System.currentTimeMillis();
-                                    score += 3;
-                                    playPowerUpSound();
-                                }
-
-                                else {
-                                    basket = filledBasket;
-                                    Log.d("TAG_COLLIDED", "flower " + (fallingFlower.getImage() == flowerBitmaps[3]));
-                                    isCrashed = true;
-                                    crashTime = System.currentTimeMillis();
-                                    score++;
-                                    playFlowerSound();
-                                }
-
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (isRunning && timeValue > 0){
+                    try {
+                        Thread.sleep(1000);
+                        timeValue--;
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                int minutes = timeValue / 60;
+                                int seconds = timeValue % 60;
+                                String timeStr = String.format("%02d:%02d", minutes, seconds);
+                                time.setText("Time: " + timeStr);
                             }
+                        });
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+                if (timeValue == 0){
+                    isRunning = false;
+                    gameOver();
+                }
+            }
+        }).start();
+    }
+
+//starting the animation in the thread
+    private void startAnimations() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                while (true){
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+
+                            showNextMole();
                         }
-                    }
-
-                    if (isCrashed && System.currentTimeMillis() - crashTime >= crashDuration) {
-                        isCrashed = false;
-                        basket = basket2;
-                    }
-
-                    int newBallX = ballX;
-
-                    if (angle < -0.05 && angle > -0.3) {
-                        newBallX -= 3;
-                    }
-
-                    else if (angle > 0.05 && angle < 0.3) {
-                        newBallX += 3;
-                    }
-
-                    else if (angle < -0.3) {
-                        newBallX -= 7;
-                    }
-
-                    else if (angle > 0.3) {
-                        newBallX += 7;
-                    }
-
-                    if (newBallX < (screenWidth / 2 - 950)) {
-                        ballX = (screenWidth / 2 - 950);
-                    }
-
-                    else if (newBallX > (screenWidth / 2 - 130)) {
-                        ballX = (screenWidth / 2 - 130);
-                    }
-
-                    else {
-                        ballX = newBallX;
-                    }
-
-                    canvas.drawBitmap(basket, (screenWidth / 2) - basket.getWidth() / 2 + ballX, (screenHeight - 250) - basket.getHeight(), null);
-
-                    canvas.drawText("Score: " + score, 720, 2017, paintProperty);
-                    canvas.drawText("Tangled Atari Project", 45, 2010, textPaint);
-
-                    holder.unlockCanvasAndPost(canvas);
-
-            }
-
-        }
-
-        public Bitmap makeTransparent(Bitmap src, int value) {
-            int width = src.getWidth();
-            int height = src.getHeight();
-            Bitmap transBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(transBitmap);
-            canvas.drawARGB(0, 0, 0, 0);
-            // config paint
-            final Paint paint = new Paint();
-            paint.setAlpha(value);
-            canvas.drawBitmap(src, 0, 0, paint);
-            return transBitmap;
-        }
-        private void playFlowerSound() {
-            soundPool.play(soundFlowerCollision, 1, 1, 1, 0, 1);
-        }
-
-        private void playPowerUpSound() {
-            soundPool.play(soundPowerupCollision, 2, 2, 1, 0, 1);
-        }
-
-        private void playEarthwormSound() {
-            soundPool.play(soundEarthwormCollision, 1, 1, 1, 0, 1);
-        }
-
-        private void playGameOverSound() {
-            soundPool.play(soundGameOver, 3, 3, 1, 0, 1);
-        }
-
-        private boolean collisionDetect(FallingImage flower) {
-            int flowerLeft = flower.getX();
-            int flowerRight = flowerLeft + flower.getWidth();
-            int flowerUp = flower.getY();
-            int flowerDown = flowerUp + flower.getHeight();
-
-            int basketLeft = (screenWidth / 2) - basket.getWidth() / 2 + ballX;
-            int basketRight = basketLeft + basket.getWidth();
-            int basketTop = (screenHeight - 90) - basket.getHeight();
-            int basketBottom = basketTop + basket.getHeight();
-
-            Log.d("FlowerLeft", flowerLeft + "");
-            Log.d("FlowerRight", flowerRight + "");
-            Log.d("FlowerUp", flowerUp + "");
-            Log.d("FlowerDown", flowerDown + "");
-            Log.d("BasketLeft", basketLeft + "");
-            Log.d("BasketRight", basketRight + "");
-            Log.d("BasketTop", basketTop + "");
-            Log.d("BasketBottom", basketBottom + "");
-
-            return flowerRight >= basketLeft && flowerLeft <= basketRight &&
-                    flowerDown >= basketTop && flowerUp <= basketBottom;
-            }
-
-        private void spawnFlower() {
-            int desiredWidth = 200;
-            int desiredHeight = 200;
-
-            Bitmap flowerBitmap = flowerBitmaps[(int) (Math.random() * flowerBitmaps.length)];
-
-            int imageId = 0;
-
-            if (flowerBitmap == flowerBitmaps[4]) {
-                imageId = R.drawable.earthworm;
-            }
-
-            if (flowerBitmap == flowerBitmaps[3]){
-                imageId = R.drawable.tangledflowerpowerup;
-            }
-
-            if (flowerBitmap == flowerBitmaps[2]){
-                imageId = R.drawable.purpleflower;
-            }
-
-            if (flowerBitmap == flowerBitmaps[1]){
-                imageId = R.drawable.pinkflower;
-            }
-
-            if (flowerBitmap == flowerBitmaps[0]){
-                imageId = R.drawable.blueflower;
-            }
-
-
-            Bitmap scaledBitmap = Bitmap.createScaledBitmap(flowerBitmap, desiredWidth, desiredHeight, false);
-            int x = (int) (Math.random() * (screenWidth - scaledBitmap.getWidth()));
-            FallingImage flower = new FallingImage(x, -scaledBitmap.getHeight(), scaledBitmap, imageId);
-            fallingFlowers.add(flower);
-        }
-
-        public void resume(){
-            running = true;
-            gameThread = new Thread(this);
-            gameThread.start();
-        }
-
-        public void pause() {
-            running = false;
-
-            while (true) {
-
-                try {
-                    gameThread.join();
-                }
-                catch (InterruptedException e) {
-
+                    });
                 }
             }
+        }).start();
+    }
+
+// showing the next mole
+    private void showNextMole() {
+        // Hide all moles and power-ups first
+        hideViews();
+
+        if (random.nextInt(10) == 0) {
+            int index = random.nextInt(powerUps.length);
+            ImageView powerUpView = powerUps[index];
+            powerUpView.setVisibility(View.VISIBLE);
+            viewAnimations(powerUpView);
         }
 
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+        else {
+            int index = random.nextInt(iceCreams.length);
+            ImageView imageView = iceCreams[index];
+            imageView.setVisibility(View.VISIBLE);
+            viewAnimations(imageView);
+        }
+    }
 
-                for (FallingImage fallingImage : fallingFlowers) {
-                    fallingImage.increaseSpeed();
-                }
+//making the animations
+    private void viewAnimations(ImageView image){
+        Animation zoomIn = new ScaleAnimation(0.5f, 2f, 0.5f, 2f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        zoomIn.setDuration(500);
+
+        Animation zoomOut = new ScaleAnimation(2f, 0.5f, 2f, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        zoomOut.setDuration(500);
+
+        AnimationSet zoomInAndOut = new AnimationSet(true);
+        zoomInAndOut.addAnimation(zoomIn);
+        zoomInAndOut.addAnimation(zoomOut);
+
+        zoomInAndOut.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
 
             }
-            return true;
-        }
 
-    } //GameSurface
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        image.setVisibility(View.INVISIBLE);
+                    }
+                }, 100);
+            }
 
-    public class FallingImage {
-        private int imageId;
-        private Bitmap image;
-        private int x, y;
-        private int speed;
+            @Override
+            public void onAnimationRepeat(Animation animation) {
 
-        public FallingImage(int x, int y, Bitmap image, int imageId) {
-            this.x = x;
-            this.y = y;
-            this.imageId = imageId;
-            this.image = image;
-            this.speed = 10;
+            }
+        });
 
-        }
+        int randomDelay = getRandomDelay();
+        image.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                image.startAnimation(zoomInAndOut);
+            }
+        }, randomDelay);
 
-        public void update() {
-            y += speed;
-        }
-        
+    }
 
-        public void draw(Canvas canvas) {
-            canvas.drawBitmap(image, x, y, null);
-        }
+//when clicked, the mole will spin 360
+    private void scaleAndSpinView(View view) {
+        AnimationSet animationSet = new AnimationSet(true);
 
-        public int getX(){
-            return x;
-        }
+        // Scale animation
+        Animation scaleAnimation = new ScaleAnimation(1f, 0.5f, 1f, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        scaleAnimation.setDuration(200);
+        animationSet.addAnimation(scaleAnimation);
 
-        public int getY() {
-            return y;
-        }
+        // Spin animation
+        Animation spinAnimation = new RotateAnimation(0, 360, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        spinAnimation.setDuration(500);
+        animationSet.addAnimation(spinAnimation);
 
-        public int getHeight(){
-            return image.getHeight();
-        }
+        view.startAnimation(animationSet);
+    }
 
-        public int getWidth(){
-            return image.getWidth();
-        }
+// random delay for more randomness
+    private int getRandomDelay() {
+        return random.nextInt(2000);
+    }
 
-        public Bitmap getImage(){
-            return image;
-        }
+//adding a tally image when something gets clicked onto a LinearLayout
+private void addTallyMark() {
+    // Increment tally count
+    tallyCount++;
 
-        public int getImageId() {
-            return imageId;
-        }
+    LinearLayout tallyLayout = findViewById(R.id.tallyLayout);
 
-        public void increaseSpeed() {
-            speed *= 4;
-        }
+    if (tallyLayout.getChildCount() == 0 || tallyLayout.getChildAt(tallyLayout.getChildCount() - 1) instanceof LinearLayout) {
+        LinearLayout newRow = new LinearLayout(this);
+        newRow.setOrientation(LinearLayout.HORIZONTAL);
+        tallyLayout.addView(newRow);
+        tallyLayout = newRow; // Set tallyLayout to the new row
+    }
 
-    } //FallingImage
+    ImageView tally = new ImageView(this);
+    tally.setImageResource(R.drawable.icecreamtally);
+    int tallySize = dpToPx(30);
+    int margin = dpToPx(2);
+    int marginTop = dpToPx(5);
+    LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(tallySize, tallySize);
+    layoutParams.setMargins(margin, marginTop, margin, 0);
+    tally.setLayoutParams(layoutParams);
+    tallyLayout.addView(tally);
 
-    public static class GameOverScreen {
-        private Context context;
+    if (tallyLayout.getChildCount() == 7) {
+        LinearLayout newRow = new LinearLayout(this);
+        newRow.setOrientation(LinearLayout.HORIZONTAL);
+        tallyLayout.addView(newRow);
+    }
+}
 
-        public GameOverScreen(Context context){
-            this.context = context;
-        }
+// changing from dp to px
+    private int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return Math.round((float) dp * density);
+    }
 
-        public static void drawOver(Canvas canvas, int score) {
-            canvas.drawRGB(211, 137, 241);
+// making a gameOverIntent
+    private void gameOver() {
+        Intent intent = new Intent(MainActivity.this, GameOverActivity2.class);
+        intent.putExtra("tallyCount", tallyCount);
+        startActivity(intent);
+    }
 
-            Paint gameOverPaint = new Paint();
-            gameOverPaint.setColor(Color.BLACK);
-            gameOverPaint.setTextSize(150);
+// power up will increase time by 5 seconds
+    private void increaseTimeByFiveSeconds() {
+        timeValue += 5;
+        updateTimeTextView();
+    }
 
-            canvas.drawText("Game Over!", 150, 800, gameOverPaint);
-            canvas.drawText("Score: " + score, 150, 1200, gameOverPaint);
-        }
+// updating the time textView
+    private void updateTimeTextView() {
+        int minutes = timeValue / 60;
+        int seconds = timeValue % 60;
+        String timeStr = String.format("%02d:%02d", minutes, seconds);
+        time.setText("Time: " + timeStr);
+    }
 
-    } // GameOverScreen
+// when start button is pressed, the game resets
+    private void resetGame() {
+        isRunning = false;
+        handler.removeCallbacksAndMessages(null);
+
+        tallyCount = 0;
+        timeValue = 30;
+        time.setText("Time: 00:30");
+        LinearLayout tallyLayout = findViewById(R.id.tallyLayout);
+        tallyLayout.removeAllViews();
+    }
+
+
 
 }
