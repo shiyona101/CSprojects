@@ -1,4 +1,4 @@
-# csprojects
+# CSprojects
 All of my CS projects from my high school career
 
 Sophomore Yr: Java Projects
