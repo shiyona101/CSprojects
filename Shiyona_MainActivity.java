@@ -1,34 +1,39 @@
-package com.example.phonebook;
+package com.example.weatherproject;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.pm.ActivityInfo;
-import android.content.res.Configuration;
-import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Parcelable;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ListView;
+import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import java.util.ArrayList;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-public class MainActivity extends AppCompatActivity {
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 
-    private ListView listView;
-    private ArrayList<ContactViews> contactList;
-    int position = -1;
-    private ImageView image_land;
-    private TextView name_land;
-    private TextView number_land;
-    private TextView bio_land;
-    private String POS_KEY = "barbie";
-    private String NUM_KEY = "lifeinthedreamhouse";
+public class Shiyona_MainActivity extends AppCompatActivity {
+
+    TextView date;
+    TextView feelsLike;
+    TextView place;
+    EditText zipcode;
+    Button check;
+    TextView temp;
+    ImageView weather;
+    SeekBar time_interval;
+    JSONObject weatherObject;
 
 
     @Override
@@ -36,97 +41,212 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        listView = findViewById(R.id.listView);
-        contactList = new ArrayList<ContactViews>();
+        zipcode = findViewById(R.id.id_zipcodE);
+        place = findViewById(R.id.location);
+        feelsLike = findViewById(R.id.weatherAndFeeling);
+        date = findViewById(R.id.date);
+        temp = findViewById(R.id.temp_image);
+        check = findViewById(R.id.check_button);
+        weather = findViewById(R.id.weather_image);
+        time_interval = findViewById(R.id.time_seekbar);
 
-        contactList.add(new ContactViews(R.drawable.barbie, "Barbie", "264-386-2121", "Barbie is a fashion icon and has had over 135 careers in her life. Though a celebrity in Malibu, she is friendly, humble and good-natured."));
-        contactList.add(new ContactViews(R.drawable.ken, "Ken", "893-265-3445", "Ken is Barbie's boyfriend and is always there when Barbie needs him. He is an inventor who makes gadgets for Barbie to use, though they usually end up malfunctioning."));
-        contactList.add(new ContactViews(R.drawable.ryan, "Ryan", "653-276-8989", "Ryan is the twin brother of Raquelle. Ryan is also an aspiring wannabe musician, who is always trying to woo Ken or Barbie with his songs. He has a crush on Barbie."));
-        contactList.add(new ContactViews(R.drawable.raquelle, "Raquelle", "143-099-1001", "Raquelle is Barbie's frenemy and has a crush on Ken, Barbie's boyfriend. She lives a very posh lifestyle in an attempt to outshine Barbie. She is portrayed as vain and arrogant and always attain what she wants."));
-        contactList.add(new ContactViews(R.drawable.skipper, "Skipper", "765-469-6336", "Skipper is Barbie's teenage sister and lives with her in the Dreamhouse. She is a tech whiz who loves trying out the latest tech toys. She is competitive and lazy, but kind and thoughtful"));
-        contactList.add(new ContactViews(R.drawable.stacey, "Stacey", "832-434-6666", "Stacie is Barbie's sporty, organized sister. She is the second oldest of Barbie's three younger sisters and lives with them in the Dreamhouse. Stacie is known for being hyperactive, honest, and always up for an adventure or mystery."));
-        contactList.add(new ContactViews(R.drawable.chelsea, "Chelsea", "123-963-6678", "Chelsea is the youngest of the sisters and knows how to work her cuteness well. This adorable kid always seems to come up with the exact super-cute thing to say in order to win over her sisters and their friends."));
-        contactList.add(new ContactViews(R.drawable.blissa, "Blissa", "135-446-7765", "Blissa is Barbie's pet cat and lives with her and her family in the Dreamhouse. Blissa is only nice to people sometimes, but she's always nice to Barbie. She is mostly seen with Chelsea."));
-        contactList.add(new ContactViews(R.drawable.tawny, "Tawny", "102-457-3452", "Tawny is Barbie's pet Palamino horse and lives with Barbie in the Dreamhouse. Tawny is obsessed with her looks. "));
-        contactList.add(new ContactViews(R.drawable.taffy, "Taffy", "309-344-3223", "Taffy is Barbie's puppy. She is a playful, sweet, and fun-loving dog. Taffy enjoys playing with frisbees, does not enjoy baths and is relatively well-behaved when she wants to be."));
-        contactList.add(new ContactViews(R.drawable.theresa, "Theresa", "773-310-2004", "She is Barbie's best friend and is a mellow, live-and-let-live type of person. Teresa is a fashion icon who is always there for her friends, even if she is not on time."));
-        contactList.add(new ContactViews(R.drawable.nikki, "Nikki", "724-349-2200", "Barbie's best friend and is also close friends with Teresa. Smart, sassy, and totally fun to be around, Nikki is a “what you see is what you get” kind of girl. For her, no adventure is too crazy."));
 
-        if (savedInstanceState != null)
-        {
-            contactList = (ArrayList<ContactViews>) savedInstanceState.getSerializable(NUM_KEY);
-            CustomAdapter customAdapter = new CustomAdapter(this, R.layout.adapter_layout, contactList);
-            listView.setAdapter(customAdapter);
-            position = savedInstanceState.getInt(POS_KEY);
-            Log.d("MainActivity", "Restored contactList");
-        }
+        check.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+               String zip = zipcode.getText().toString().trim();
+               new ASync().execute(zip);
+            }
+        });
 
-        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE)
-        {
-            CustomAdapter customAdapter = new CustomAdapter(this, R.layout.adapter_layout, contactList);
-            listView.setAdapter(customAdapter);
+        time_interval.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int index = progress;
+                try {
+                    updateUI(index);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
 
-            if (position >= 0){
-                ContactViews current = contactList.get(position);
-                image_land = findViewById(R.id.contact_image_land);
-                image_land.setImageResource(current.getContactImageID());
+                String weatherStr = null;
+                try {
+                    weatherStr = weatherObject.getJSONArray("list").getJSONObject(index).getJSONArray("weather").getJSONObject(0).getString("description");
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                }
 
-                bio_land = findViewById(R.id.contact_bio_land);
-                bio_land.setText(current.getContactBio());
+                if (weatherStr.contains("clear")){
+                    weather.setImageResource(R.drawable.sun);
+                }
 
-                number_land = findViewById(R.id.contact_number_land);
-                number_land.setText(current.getContactNumber());
+                else if (weatherStr.contains("few")){
+                    weather.setImageResource(R.drawable.fewclouds);
+                }
 
-                name_land = findViewById(R.id.contact_name_land);
-                name_land.setText(current.getContactName());
+                else if (weatherStr.contains("broken")){
+                    weather.setImageResource(R.drawable.brokenclouds);
+                }
+
+                else if (weatherStr.contains("scattered")){
+                    weather.setImageResource(R.drawable.scatteredclouds);
+                }
+
+                else if (weatherStr.contains("snow")){
+                    weather.setImageResource(R.drawable.snow);
+                }
+
+                else if (weatherStr.contains("thunderstorm")){
+                    weather.setImageResource(R.drawable.thunderstorm);
+                }
+
+                else if (weatherStr.contains("rain")){
+                    weather.setImageResource(R.drawable.rain);
+                }
+
+                else if (weatherStr.contains("mist")){
+                    weather.setImageResource(R.drawable.mist);
+                }
+
             }
 
-            listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                    position = i;
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
 
-                    if (i >= 0){
-                        ContactViews current = contactList.get(position);
-                        image_land = findViewById(R.id.contact_image_land);
-                        image_land.setImageResource(current.getContactImageID());
+            }
 
-                        bio_land = findViewById(R.id.contact_bio_land);
-                        bio_land.setText(current.getContactBio());
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
 
-                        number_land = findViewById(R.id.contact_number_land);
-                        number_land.setText(current.getContactNumber());
-
-                        name_land = findViewById(R.id.contact_name_land);
-                        name_land.setText(current.getContactName());
-                    }
-                }
-            });
-
-
-        }
-
-        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT)
-        {
-            CustomAdapter customAdapter = new CustomAdapter(this, R.layout.adapter_layout, contactList);
-            listView.setAdapter(customAdapter);
-
-            listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                    Toast.makeText(MainActivity.this, "Hi! I am " + contactList.get(i).getContactName() + "!", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
+            }
+        });
 
     }
 
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putSerializable(POS_KEY, position);
-        outState.putSerializable(NUM_KEY, contactList);
-        Log.d("MainActivity", "onSaveInstanceState called");
-    }
+    private void updateUI(int index) throws JSONException {
+        String dateTime = weatherObject.getJSONArray("list").getJSONObject(index).getString("dt_txt");
+        String[] dateTimeParts = dateTime.split(" ");
+        String date1 = dateTimeParts[0];
+        String time = dateTimeParts[1].substring(0, 5);
 
+        // Extracting temperature and weather description
+        String temperature = weatherObject.getJSONArray("list").getJSONObject(index).getJSONObject("main").getString("temp");
+        String description = weatherObject.getJSONArray("list").getJSONObject(index).getJSONArray("weather").getJSONObject(0).getString("description");
+
+        // Setting AM/PM period
+        int hour = Integer.parseInt(time.substring(0, 2));
+        String period = (hour >= 12) ? "PM" : "AM";
+        if (hour > 12) {
+            hour -= 12;
+        } else if (hour == 0) {
+            hour = 12;
+        }
+
+        // Update UI elements
+        place.setText(weatherObject.getJSONObject("city").getString("name"));
+        date.setText(date1 + "\t\t\t\t\t\t\t" + hour + time.substring(2) + " " + period);
+        temp.setText(temperature + "°F");
+        feelsLike.setText(description + ", feels like " + weatherObject.getJSONArray("list").getJSONObject(index).getJSONObject("main").getString("feels_like") + "°F");
+    }
+    public class ASync extends AsyncTask<String, Void, String>{
+
+        @Override
+        protected String doInBackground(String... strings) {
+            String info;
+            try {
+                Log.d("aniiakkakka", "doInBackground");
+                URL link = new URL("https://api.openweathermap.org/data/2.5/forecast?zip=" + strings[0] + "&appid=58ab4a74ffd431949eb72bea6c3de6a1&units=imperial");
+                //URL link = new URL("https://api.openweathermap.org/data/2.5/forecast?zip=08540&appid=58ab4a74ffd431949eb72bea6c3de6a1&units=imperial");
+                Log.d("aniiakkakka", "URL");
+                URLConnection connection = link.openConnection();
+                Log.d("aniiakkakka", "URLConnection");
+                InputStream inputStream = connection.getInputStream();
+                Log.d("aniiakkakka", "InputStreAM");
+                BufferedReader buff = new BufferedReader(new InputStreamReader(inputStream));
+                Log.d("aniiakkakka", "bufferefReader");
+                info = buff.readLine();
+                weatherObject = new JSONObject(info);
+
+
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+
+
+            return info;
+        }
+
+        @Override
+        protected void onPostExecute(String info) {
+            Log.d("aniiakkakka", "Changing rnnnn");
+
+            try {
+                String dateTime = weatherObject.getJSONArray("list").getJSONObject(0).getString("dt_txt");
+                String[] dateTimeParts = dateTime.split(" ");
+                String date1 = dateTimeParts[0];
+                String time = dateTimeParts[1].substring(0, 5);
+
+                int hour = Integer.parseInt(time.substring(0, 2));
+                String period = (hour >= 12) ? "PM" : "AM";
+                if (hour > 12) {
+                    hour -= 12;
+                } else if (hour == 0) {
+                    hour = 12;
+                }
+
+
+                place.setText(weatherObject.getJSONObject("city").getString("name"));
+                date.setText(date1 + "\t\t\t\t\t\t\t" + hour + time.substring(2) + " " + period);
+                feelsLike.setText(weatherObject.getJSONArray("list").getJSONObject(0).getJSONArray("weather").getJSONObject(0).getString("description") + ", feels like " + weatherObject.getJSONArray("list").getJSONObject(0).getJSONObject("main").getString("feels_like")+"°F");
+                temp.setText(weatherObject.getJSONArray("list").getJSONObject(0).getJSONObject("main").getString("temp")+"°F");
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+            Log.d("aniiakkakka", "Changed rnnn");
+
+            String weatherStr = null;
+            try {
+                weatherStr = weatherObject.getJSONArray("list").getJSONObject(0).getJSONArray("weather").getJSONObject(0).getString("description");
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+
+            if (weatherStr.contains("clear")){
+                weather.setImageResource(R.drawable.sun);
+            }
+
+            else if (weatherStr.contains("few")){
+                weather.setImageResource(R.drawable.fewclouds);
+            }
+
+            else if (weatherStr.contains("broken")){
+                weather.setImageResource(R.drawable.brokenclouds);
+            }
+
+            else if (weatherStr.contains("scattered")){
+                weather.setImageResource(R.drawable.scatteredclouds);
+            }
+
+            else if (weatherStr.contains("snow")){
+                weather.setImageResource(R.drawable.snow);
+            }
+
+            else if (weatherStr.contains("thunderstorm")){
+                weather.setImageResource(R.drawable.thunderstorm);
+            }
+
+            else if (weatherStr.contains("rain")){
+                weather.setImageResource(R.drawable.rain);
+            }
+
+            else if (weatherStr.contains("mist")){
+                weather.setImageResource(R.drawable.mist);
+            }
+
+        }
+    }
 }
